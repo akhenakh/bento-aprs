@@ -1,0 +1,40 @@
+input:
+  aprs_is:
+    address: "rotate.aprs2.net:14580"
+    callsign: "N0CALL"
+    passcode: "-1"
+    # An example filter: receive weather packets within 500km of Quebec
+    filter: "t/w r/46.82/-71.25/200"
+
+pipeline:
+  processors:
+    # If there's no error, we can use Bloblang to extract specific fields
+    # to flatten or map the data as needed
+    - mapping: |
+        if @aprs_error != null {
+          # Keep the raw data if it errored out
+          root.raw = content().string()
+          root.error = @aprs_error
+        } else {
+          # Restructure the successfully parsed fap.Packet object
+          root.source = this.SrcCallsign
+          root.latitude = this.Latitude
+          root.longitude = this.Longitude
+          root.pressure = this.Wx.Pressure
+          root.temp = this.Wx.Temp
+          # root.orig = this
+        }
+
+output:
+  switch:
+    cases:
+      # Route errors to stderr
+      - check: '@aprs_error != null'
+        output:
+          stdout:
+            codec: lines
+      
+      # Route valid, mapped data elsewhere (e.g. standard out or a database)
+      - output:
+          stdout:
+            codec: lines
