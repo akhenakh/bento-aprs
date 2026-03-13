@@ -48,23 +48,20 @@ If a packet fails to parse, the raw packet is output with `@aprs_error` metadata
 
 ## Example Configuration
 
-```yamlinput:
+```yaml
+input:
   aprs_is:
     address: "rotate.aprs2.net:14580"
     callsign: "N0CALL"
     passcode: "-1"
-    # Filter: receive weather packets within 200km of Quebec City
-    filter: "t/w r/46.82/-71.25/200"
+    filter: "r/46.82/-71.25/200"
 
 pipeline:
   processors:
-    - mapping: |
-        if @aprs_error != null {
-          # Keep raw data if parsing failed
-          root.raw = content().string()
-          root.error = @aprs_error
+    # Client-side filter: only pass weather packets
+    - mapping: |if this.Wx == null || (this.Wx.Temp == null && this.Wx.Pressure == null) {
+          root = deleted()
         } else {
-          # Extract fields from parsed packet
           root.source = this.SrcCallsign
           root.latitude = this.Latitude
           root.longitude = this.Longitude
@@ -93,12 +90,16 @@ APRS-IS filters allow you to limit the data received:
 | Filter | Description |
 |--------|-------------|
 | `r/50/10/500` | Range: within 500km of lat 50, lon 10 |
-| `t/w` | Type: weather packets only|
+| `t/w` | Type: weather packets only |
 | `t/po` | Type: position and objects |
 | `b/ABCDEF` | Budlist: packets from specific stations |
 | `p/N0CALL` | Prefix: packets from callsign prefix |
 
-Multiple filters can be combined: `t/w r/50/10/200 b/WXSERVER`
+### Important: Combining Range and Type Filters
+
+APRS-IS servers do not properly AND `t/w` (weather) and `r/` (range) filters together. When both are specified, the range filter is often ignored.
+
+**Workaround**: Use range filter (`r/`) on the server side and filter for weather packets client-side in your Bento pipeline (see example configuration above).
 
 ## Building
 
