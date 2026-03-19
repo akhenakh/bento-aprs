@@ -1,4 +1,4 @@
-package plugins
+package aprs
 
 import (
 	"context"
